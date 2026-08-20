@@ -308,10 +308,6 @@
     }
   }
   window.addEventListener('hashchange', routeFromHash);
-  document.getElementById('link-admin-access').addEventListener('click', function(e){
-    e.preventDefault();
-    window.location.hash = 'admin';
-  });
   document.getElementById('link-back-site').addEventListener('click', function(e){
     e.preventDefault();
     window.location.hash = 'home';
