@@ -10,7 +10,7 @@
   var placeholderSVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="7" width="18" height="13" rx="1.5"/><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7"/><circle cx="12" cy="13" r="3"/></svg>';
 
   // ===== FIREBASE — BANCO DE DADOS EM TEMPO REAL (mesmo projeto do ImóvelPrime, caminho separado) =====
-  var FB_URL = 'https://imovelprime-b1a4e-default-rtdb.firebaseio.com';
+  var FB_URL = 'https://imobiliaria-mensch-default-rtdb.firebaseio.com';
   var FB_PATH = 'imoveis_mensch';
   var properties = []; // cache local dos imóveis carregados do Firebase
 
@@ -27,6 +27,7 @@
 
   // Busca os imóveis no Firebase; se offline, cai para o backup salvo no localStorage
   async function loadData(){
+    var fetchFailed = false;
     try{
       var resp = await fetch(FB_URL + '/' + FB_PATH + '.json');
       var data = await resp.json();
@@ -36,15 +37,32 @@
         properties = [];
       }
     }catch(e){
+      fetchFailed = true;
       try{
         var raw = localStorage.getItem(STORAGE_KEY);
         properties = raw ? JSON.parse(raw) : [];
       }catch(e2){ properties = []; }
     }
-    // Primeira vez (banco vazio): popula com os imóveis de exemplo
-    if(properties.length === 0){
-      properties = seedData();
-      await saveData();
+    // Só popula com os imóveis de exemplo se: (1) a leitura funcionou de verdade
+    // (não foi só uma falha de rede interpretada como "vazio"), E (2) isso nunca
+    // aconteceu antes neste banco. Isso evita apagar imóveis reais por engano.
+    if(!fetchFailed && properties.length === 0){
+      try{
+        var seededResp = await fetch(FB_URL + '/' + FB_PATH + '_seeded.json');
+        var alreadySeeded = await seededResp.json();
+        if(!alreadySeeded){
+          properties = seedData();
+          await saveData();
+          await fetch(FB_URL + '/' + FB_PATH + '_seeded.json', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(true)
+          });
+        }
+      }catch(e){
+        // Se não der pra confirmar com segurança, não populamos nada — mais seguro
+        // deixar a vitrine vazia do que arriscar sobrescrever dados reais.
+      }
     }
   }
 
